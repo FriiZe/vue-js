@@ -1,0 +1,2600 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <title>Elective Vue.js</title>
+
+  <link rel="stylesheet" href="dist/reset.css">
+  <link rel="stylesheet" href="dist/reveal.css">
+  <link rel="stylesheet" href="dist/theme/black.css">
+
+  <!-- Theme used for syntax highlighted code -->
+  <link rel="stylesheet" href="plugin/highlight/monokai.css">
+</head>
+
+<body>
+  <div class="reveal">
+    <div class="slides">
+      <section>
+        <h1>Elective Vue.js</h1>
+      </section>
+      <section>
+        <section>
+          <h2>DOM et Virtual DOM</h2>
+        </section>
+        <section>
+          <h3>Le dom, c'est quoi ?</h3>
+          <ul>
+            <li>Document Object Model</li>
+            <li>Representation du HTML sous forme d'arbre</li>
+          </ul>
+          <pre><code data-line-numbers data-trim>
+<div>
+  <h1>Compteur</h1>
+  <div id="counter">
+    0
+  </div>
+  <button>Click Me !</button>
+</div>
+</code></pre>
+          Une representation du DOM donne :
+          <pre><code data-line-numbers>html
+  -> head
+  -> div
+     -> h1
+        -> "Compteur"
+     -> div (id="counter")
+        -> "0"
+     -> button
+        -> "Click Me !"</code></pre>
+        </section>
+        <section>
+          <h3>Le DOM, c'est quoi ?</h3>
+          Il est possible de modifier le DOM grace au JS :
+          <pre><code data-line-numbers>function onButtonClick() {
+  const div = document.getElementById('counter')
+  console.log(div.innerText); // affiche "0"
+  /** 
+  * On utilise le premier + pour convertir le innerText
+  * qui est une string en nombre,
+  * et on utilise l'interpolation de string pour passer une string au innerText
+  * car on tient à conserver des types cohérents
+  */
+  div.innerText = `${+div.innerText + 1}`;
+}
+document.getElementByTagsName('button')[0].addEventListener('click', onButtonClick)</code></pre>
+          <pre><code data-line-numbers>html
+  -> head
+  -> body
+     -> h1
+        -> "Compteur"
+     -> div (id="counter")
+        -> 1
+     -> button
+        -> "Click Me !"</code></pre>
+        </section>
+        <section>
+          Toute manipulation du DOM est très lente,
+          le JavaScript est très rapide, mais le moindre changement sur le DOM prend du temps. En effet le navigateur
+          doit recalculer et changer l'affichage.
+        </section>
+        <section>
+          Manipuler le DOM de cette manière n'est pas super pratique, c'est pourquoi un certain nombre de framework
+          propose d'utiliser des fonctions de rendus pour gérer l'affichage
+          <li><em>index.html</em></li>
+          <pre><code data-line-numbers><script type="text/template"><div id="main"></div>
+<script src="main.js"/>
+</script></code></pre>
+        </section>
+        <section>
+          <li><em>main.js</em></li>
+          <pre><code data-line-numbers>let counter = 0;
+function onButtonClick() {
+  counter++;
+  render();
+}
+function render() {
+  const h1 = document.createElement('h1');
+  h1.innerText = "Compteur";
+  const div = document.createElement('div');
+  const counterText = document.createTextNode(`${counter}`);
+  div.appendChild(counterText);
+  const btn = document.createElement('button');
+  btn.innerText = "Click Me !";
+  btn.addEventListener('click', onButtonClick);
+  const main = document.getElementById('main');
+  main.innerHTML = ''; // on vide l'élément
+  main.appendChild(h1);
+  main.appendChild(div);
+  main.appendChild(btn);
+}
+// On attend que la page soit totalement chargée et que le DOM soit affiché par le navigateur
+document.addEventListener('DOMContentLoaded', () => render());</code></pre>
+        </section>
+        <section>
+          <ul>
+            <li>Quels sont les avantages ?</li>
+            <li>Quels sont les inconvénients ?</li>
+            <li>Des idées pour résoudre les inconvénients ?</li>
+          </ul>
+        </section>
+        <section>
+          Le plus gros inconvénient, et qu'à chaque appel de la fonction render() tout le DOM sera regénéré, et cela
+          prendra énormément de temps, sur des grosses applis, ce n'est pas viable.
+        </section>
+        <section>
+          <pre><code data-line-numbers>let counter = 0;
+
+function onButtonClick() {
+  counter++;
+  updateDOM();
+}
+
+let virtualDom = {};
+
+h(tagName, attributes, content) {
+  return { tagName, attributes, content };
+}
+
+function render() {
+  return h('div', {}, [
+    h('h1', {}, 'Compteur');
+    h('div', { id: 'counter' }, `${counter}`),
+    h('button', { onClick: onButtonClick }, 'Click Me !'),
+  ]);
+}
+
+function updateDOM() {
+  // Ici aucune modification du DOM on obtient juste un big objet qui a été généré très rapidement
+  const newVirtualDom = render();
+  // On imagine ici une fonction getPatchDiff, qui ne retourne que les différences entre les deux dom, ce sont simplement des objets javascript, donc la comparaison est très rapide
+  const patchObject = getPatchDiff(newVirtualDom, oldVirtualDom);
+  // On imagine une fonction qui appliquera les différences au DOM, en utilisant les fonctions tels que `createElement`, `replaceElement` ou directement des modification d'attributs
+  applyPatchObject(patchObject);
+  // Finalement on met à jour l'ancien VirtualDom
+  virtualDom = newVirtualDom;
+}
+
+// On attend que la page soit totalement chargée et que le DOM soit affiché par le navigateur
+document.addEventListener('DOMContentLoaded', () => updateDOM());
+            </code></pre>
+        </section>
+        <section>C'est le concept derriere React ou Vue</section>
+        <section>
+          Avec Vue cela donne :
+          <pre><code data-line-numbers>const main = new Vue({
+  data: { counter: 0 },
+  el: '#main',
+  methods: {
+    onButtonClick() { this.data.counter++; }
+  }
+  render(h) {
+    return h('div', {}, [
+      h('h1', {}, 'Compteur');
+      h('div', { id: 'counter' }, `${this.data.counter}`),
+      h('button', { onClick: this.methods.onButtonClick }, 'Click Me !'),
+    ]);
+  }
+})</code></pre>
+        </section>
+        <section>
+          Et avec un fichier .vue :
+          <pre><code data-line-numbers><script>
+  module.exports = {
+    data: { counter: 0 },
+    methods: {
+      onButtonClick() { this.data.counter++; }
+    }
+  }
+</script>
+
+<template>
+  <div>
+    <h1>Compteur</h1>
+    <div id='counter'>{{ counter }}</div>
+    <button onClick="onButtonClick">Click Me !</button>
+  </div>
+</template></code></pre>
+        </section>
+      </section>
+      <section>
+        <section>
+          <h2>Introduction</h2>
+        </section>
+        <section>
+          <h3>
+            Vue
+          </h3>
+          <ul>
+            <li>Cree en 2014 par Evan You, ancien employe de Google</li>
+            <li>Open source</li>
+            <li>Framework model-view-viewmodel</li>
+            <li>Tres populaire : 185k Star et 29.5k Forks</li>
+          </ul>
+        </section>
+        <section>
+          <h3>
+            Les avantages
+          </h3>
+          <ul>
+            <li>Taille (seulement 18-21KB)</li>
+            <li>Simplicite</li>
+            <li>Documentation & Support</li>
+            <li>Virtual DOM</li>
+            <li>Democratisation du JSX</li>
+          </ul>
+        </section>
+        <section data-background-video="./assets/framework_popularity.mp4"></section>
+      </section>
+      <section>
+        <section>
+          <h2>Installation et mise en place</h2>
+          <pre><code data-trim data-noescape>
+              $ npm install -g vue-cli ## npm update -g @vue/cli
+              [sudo] Mot de passe de romain :
+              /usr/bin/vue -> /usr/lib/node_modules/@vue/cli/bin/vue.js
+              > @apollo/protobufjs@1.2.2 postinstall /usr/lib/node_modules/@vue/cli/node_modules/@apollo/protobufjs
+              > node scripts/postinstall
+              
+              
+              > ejs@2.7.4 postinstall /usr/lib/node_modules/@vue/cli/node_modules/ejs
+              > node ./postinstall.js
+              
+              Thank you for installing EJS: built with the Jake JavaScript build tool (https://jakejs.com/)
+              
+              + @vue/cli@4.5.13
+              added 928 packages from 583 contributors in 45.897s
+
+            </code></pre>
+        </section>
+        <section>
+          <h3>Creation du premier projet</h3>
+          <pre><code data-trim data-noescape>
+              $ vue create my_first_project
+
+              Vue CLI v4.5.13
+              ? Please pick a preset: Manually select features
+              ? Check the features needed for your project: 
+               ◉ Choose Vue version
+               ◉ Babel
+               ◯ TypeScript
+               ◯ Progressive Web App (PWA) Support
+              ❯◉ Router
+               ◯ Vuex
+               ◯ CSS Pre-processors
+               ◉ Linter / Formatter
+               ◯ Unit Testing
+               ◯ E2E Testing
+            </code></pre>
+        </section>
+        <section>
+          <pre><code data-trim data-noescape>
+              Vue CLI v4.5.13
+              ? Please pick a preset: Manually select features
+              ? Check the features needed for your project: Choose Vue version, Babel, Router, Linter
+              ? Choose a version of Vue.js that you want to start the project with 2.x
+              ? Use history mode for router? (Requires proper server setup for index fallback in production) No
+              ? Pick a linter / formatter config: Airbnb
+              ? Pick additional lint features: Lint on save
+              ? Where do you prefer placing config for Babel, ESLint, etc.? In dedicated config files
+              ? Save this as a preset for future projects? (y/N) n
+            </code></pre>
+        </section>
+        <section>
+          <img align="right" data-src="./assets/archi_1.png">
+          <img width="65%" align="left" data-src="./assets/prompt_1.png">
+        </section>
+        <section>
+          <img data-src="./assets/home_page.png">
+        </section>
+      </section>
+      <section>
+        <section>
+          <h2>Analyse des fichiers existants</h2>
+        </section>
+        <section>
+          <h3>App.vue</h3>
+          <pre><code data-line-numbers="4,5,7,8"><template>
+  <div id="app">
+    <div id="nav">
+      <router-link to="/">Home</router-link>
+      <router-link to="/about">About</router-link>
+    </div>
+    <router-view></router-view>
+  </div>
+</template>
+
+<style>
+  #app {
+    font-family: Avenir, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-align: center;
+    color: #2c3e50;
+  }
+</style></code></pre>
+        </section>
+        <section>
+          <h3>Home.vue</h3>
+          <pre><code data-line-numbers="1,3,5,7,17"><template>
+  <div class="home">
+    <HelloWorld msg="Welcome to Your Vue.js App"/>
+  </div>
+</template>
+
+<script>
+  // @ is an alias to /src
+  import HelloWorld from '@/components/HelloWorld.vue';
+
+  export default {
+    name: 'Home',
+    components: {
+      HelloWorld,
+    },
+  };
+</script></code></pre>
+        </section>
+        <section>
+          <h3>HelloWorld.vue</h3>
+          <pre><code data-line-numbers="1,7,9,16,23,19"><template>
+  <div class="hello">
+    <h1>{{ msg }}</h1>
+    <h3>Installed CLI Plugins</h3>
+    <h3>Ecosystem</h3>
+  </div>
+</template>
+
+<script>
+  export default {
+    name: 'HelloWorld',
+    props: {
+      msg: String,
+    },
+  };
+</script>
+
+<!-- Add "scoped" attribute to limit CSS to this component only -->
+<style scoped>
+  h3 {
+    margin: 40px 0 0;
+  }
+</style></code></pre>
+        </section>
+        <section>
+          <h3>router.js</h3>
+          <pre><code data-line-numbers="7-12,16,20-22,5">import Vue from 'vue';
+import VueRouter from 'vue-router';
+import Home from '../views/Home.vue';
+
+Vue.use(VueRouter);
+
+const routes = [
+  {
+    path: '/',
+    name: 'Home',
+    component: Home,
+  },
+  {
+    path: '/about',
+    name: 'About',
+    component: () => import('../views/About.vue'),
+  },
+];
+
+const router = new VueRouter({
+  routes,
+});
+
+export default router;
+
+            </code></pre>
+        </section>
+      </section>
+      <section>
+        <section>
+          <h2>Nomenclature et convention</h2>
+          <ul>
+            <li>Le nom d'un composant s'ecrit en PascalCase(.vue)</li>
+            <li>Deux dossiers distincts : views et components</li>
+            <li>Un dossier par page au sein du dossier views contenant : </li>
+            <ul>
+              <li>
+                "index.vue": le composant le plus haut de cette page
+              </li>
+              <li>
+                Les composants propres a cette page<br />
+                <em>Attention aux exports !</em>
+              </li>
+            </ul>
+          </ul>
+        </section>
+        <section>
+          <h2>
+            Nomenclature et convention
+          </h2>
+          <ul>
+            <li>
+              Les composants :
+              <ul>
+                <li>AppXxxx.vue : Composant qui sera reutilise partout au sein de l'application avec un meme style /
+                  comportement (ex: AppButton.vue)</li>
+                <li>TheXxxx.vue : Composant au comportement unique au sein de l'application appele une seule et unique
+                  fois (ex : TheNavbar.vue)</li>
+                <li>Le nom d'un composant doit refleter son utilite</li>
+              </ul>
+            </li>
+          </ul>
+        </section>
+      </section>
+      <section>
+        <section>
+          <h3>Les directives</h3>
+          <span>
+            Les directives sont préfixées par v- pour indiquer que ce sont des attributs spéciaux fournis par Vue et
+            appliquent un comportement specifique
+          </span>
+        </section>
+        <section>
+          <h3>Les directives</h3>
+          <ul>
+            <li>v-text : </li>
+            <pre><code data-line-numbers><span v-text="msg"></span>
+<!-- same as -->
+<span>{{msg}}</span></code></pre>
+            <li>v-html : Insere un contenu HTMl qui ne sera pas interprete comme template vue</li>
+            <li>v-pre : Esquive la compilation pour cet element (afficher les tags mustache, accelerer la compilation)
+            </li>
+            <li>v-once : Rend le composant une seule fois. Dans le cas ou le composant est rerendu, cet element sera
+              ignore</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Les directives (Rendu conditionnel)</h3>
+          <ul>
+            <li>v-show : Change la propriete CSS display en fonction d'une condition</li>
+            <li>v-if : Rend l'element ou non en fonction d'une condition</li>
+          </ul>
+          Difference entre v-if et v-show ?
+        </section>
+        <section>
+          <h3>Les directives (Rendu conditionnel)</h3>
+          <ul>
+            <li>v-show : Change la propriete CSS display en fonction d'une condition</li>
+            <li>v-if : Rend l'element ou non en fonction d'une condition</li>
+            <li>v-else-if</li>
+            <li>v-else</li>
+          </ul>
+          <pre><code data-line-numbers><div v-if="type === 'A'">
+  A
+</div>
+<div v-else-if="type === 'B'">
+  B
+</div>
+<div v-else-if="type === 'C'">
+  C
+</div>
+<div v-else>
+  Not A/B/C
+</div></code></pre>
+        </section>
+        <section>
+          <h3>Les directives</h3>
+          <ul>
+            <li>v-for : Rend l'element un certain nombre de fois en fonction d'une donnee</li>
+          </ul>
+          <pre><code data-line-numbers><div v-for="item in items">
+  {{ item.text }}
+</div>
+
+<div v-for="(item, index) in items"></div>
+<div v-for="(value, key) in object"></div>
+<div v-for="(value, name, index) in object"></div>
+
+<div v-for="item in items" :key="item.id">
+  {{ item.text }}
+</div></code></pre>
+
+        </section>
+        <section>
+          <h3>Les directives</h3>
+          <ul>
+            <li>v-model : Associe (bind) la valeur d'un input (input, textarea, select, ...) a une variable</li>
+          </ul>
+          <img align="right" data-src="https://learnvue.co/wp-content/uploads/2021/01/Jan-05-2021-15-52-20.gif">
+          <pre><code data-line-numbers width='50% !important'><template>
+  <div>
+    <input type="text" v-model='inputValue'>
+    <div>Value: {{ inputValue }}</div>
+  </div>
+</template>
+
+<script>
+  export default {
+    name: 'VModelDemo',
+    data: function () {
+      return {
+        inputValue: '',
+      };
+    },
+  }
+</script>
+        </code></pre>
+        </section>
+        <section>
+          <h3>
+            Les directives (v-slot)
+          </h3>
+          <pre><code data-line-numbers><div class="container"> <!-- base-layout.vue -->
+  <header>
+    <slot name="header"></slot>
+  </header>
+  <main>
+    <slot></slot>
+  </main>
+  <footer>
+    <slot name="footer"></slot>
+  </footer>
+</div></code></pre>
+          <pre><code data-line-numbers><base-layout>
+  <template v-slot:header>
+    <h1>Here might be a page title</h1>
+  </template>
+
+  <template v-slot:default>
+    <p>A paragraph for the main content.</p>
+    <p>And another one.</p>
+  </template>
+
+  <template v-slot:footer>
+    <p>Here's some contact info</p>
+  </template>
+</base-layout></code></pre>
+        </section>
+        <section>
+          <h3>Les directives</h3>
+          <ul>
+            <li>v-bind(:) : Associe (bind) un ou plusieurs attributs, ou une prop d'un composant a une expression. </li>
+          </ul>
+          <pre><code data-line-numbers><!-- bind an attribute -->
+<img v-bind:src="imageSrc" />
+
+<!-- dynamic attribute name -->
+<button v-bind:[key]="value"></button>
+
+<!-- shorthand dynamic attribute name -->
+<button :[key]="value"></button>
+
+<!-- class binding -->
+<div :class="[classA, { classB: isB, classC: isC }]">
+  <!-- style binding -->
+  <div :style="{ fontSize: size + 'px' }"></div>
+
+  <!-- binding an object of attributes -->
+  <div v-bind="{ id: someProp, 'other-attr': otherProp }"></div>
+
+  <!-- prop binding. "prop" must be declared in my-component. -->
+  <my-component :prop="someThing"></my-component>
+
+  <!-- pass down parent props in common with a child component -->
+  <child-component v-bind="$props"></child-component></div></code></pre>
+        </section>
+        <section>
+          <h3>Les directives</h3>
+          <ul>
+            <li>v-on(@) : Permet d'attacher un eventListener a cet element. Par defaut, il n'ecoute que les events
+              natifs du DOM (click, keyup, ...)</li>
+          </ul>
+          <pre><code data-line-numbers><!-- method handler -->
+<button v-on:click="doThis"></button>
+
+<!-- dynamic event -->
+<button v-on:[event]="doThis"></button>
+
+<!-- inline statement -->
+<button v-on:click="doThat('hello', $event)"></button>
+
+<!-- stop propagation -->
+<button @click.stop="doThis"></button>
+
+<!-- prevent default -->
+<button @click.prevent="doThis"></button>
+
+<!-- prevent default without expression -->
+<form @submit.prevent></form></code></pre>
+        </section>
+      </section>
+      <section>
+        <section>
+          <h2>Specificites</h2>
+        </section>
+        <section>
+          <h2>Specificites du template</h2>
+          <ul>
+            <li>Possibilite d'utiliser un moteur de templating (pug, handlebars, ...)</li>
+            <li>Un seul noeud parent</li>
+            <li>Insertion de JS avec la notation {{ }}</li>
+          </ul>
+        </section>
+        <section>
+          <h2>Specificites du script</h2>
+          <pre><code data-line-numbers>export default {
+name: 'Users',
+/** Les variables propres au composant */
+data() {},
+/** Les methodes propres au composant */
+methods: {
+  addUser() {},
+},
+/** Getters permettant souvent d'alleger la logique au sein du template et dependent des data */
+computed: {
+  userList() {},
+},
+/**
+  * Fonctions executees lorsqu\'une certaine variable change.
+  * La fonction prend en parametre la nouvelle et l'ancienne valeur.
+  */
+watchers: {},
+/**  Les props recues par le composant */
+props: {},
+/** Les lifecycle hooks created, mounted, updated et destroyed sont egalement disponibles. */
+};</code></pre>
+        </section>
+      </section>
+      <section>
+        <section>
+          <h2>TP Todo list</h2>
+          <ul>
+            <li>Ajout, suppression, edition des todos</li>
+            <li>Suppression multiple</li>
+            <li>Filtres</li>
+            <li>Un compteur de todos (globales et selectionnees)</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Une todo doit contenir :</h3>
+          <ul>
+            <li>Un titre</li>
+            <li>Un nombre d'heures estimees</li>
+            <li>Un responsable (select)</li>
+          </ul>
+        </section>
+        <section>
+          <h3>On ne doit pas pouvoir soumettre si :</h3>
+          <ul>
+            <li>Un des champs est vide</li>
+            <li>Le nombre d'heures n'est pas un nombre</li>
+            <li>Si le responsable a deja au moins 3 taches en cours ou si la somme du nombre d'heures de ses taches
+              depasse 10</li>
+          </ul>
+          <div>
+            Si un de ces cas se produit, un message d'erreur doit apparaitre
+          </div>
+        </section>
+      </section>
+      <section>
+        <h2>vue-router</h2>
+      </section>
+      <section>
+        <h2>Installation</h2>
+        - npm
+        <pre><code>$ npm install vue-router</code></pre>
+        <pre><code data-line-numbers>import Vue from 'vue'
+import VueRouter from 'vue-router'
+
+Vue.use(VueRouter)</code></pre>
+        - Vue CLI
+        <pre><code>$ vue add router</code></pre>
+      </section>
+      <section>
+        <section>
+          <h3>Utilisation</h3>
+        </section>
+        <section>
+          <pre><code data-line-numbers="4-7,10,11"><div id="app">
+<h1>Hello App!</h1>
+<p>
+  <!-- use router-link component for navigation. -->
+  <!-- specify the link by passing the `to` prop. -->
+  <router-link to="/foo">Go to Foo</router-link>
+  <router-link to="/bar">Go to Bar</router-link>
+</p>
+
+<!-- component matched by the route will render here -->
+<router-view></router-view>
+</div></code></pre>
+        </section>
+        <section>
+          <h3>Structure du router</h3>
+          <pre><code data-line-numbers>const router = new VueRouter({
+  routes: [
+    {
+      path: '/user/:id',
+      component: User,
+      children: [
+        {
+          /** UserProfile will be rendered inside User's router-view
+          when /user/:id/profile is matched */
+          path: 'profile',
+          component: UserProfile
+        },
+        {
+          /** UserPosts will be rendered inside User's router-view
+          when /user/:id/posts is matched */
+          path: 'posts',
+          component: UserPosts
+        }
+      ]
+    }
+  ]
+})</code></pre>
+        </section>
+        <section>
+          <pre><code data-line-numbers>new Vue({
+  router,
+  render: (h) => h(App),
+}).$mount('#app');
+            </code></pre>
+          Inclure le router au moment d'instancier l'application permet de l'injecter partout au sein de celle-ci. On a
+          donc acces a <b><em>this.$router</em></b> et <b><em>this.$route</em></b>
+        </section>
+        <section>
+          <h3>$route et $router</h3>
+          <pre><code data-line-numbers>/** literal string path */
+router.push('home')
+
+/** object */
+router.push({ path: 'home' })
+
+/** named route */
+router.push({ name: 'user', params: { userId: '123' } })
+
+/** with query, resulting in /register?plan=private */
+router.push({ path: 'register', query: { plan: 'private' } })
+
+const userId = '123'
+router.push({ name: 'user', params: { userId } }) -> /user/123
+router.push({ path: `/user/${userId}` }) -> /user/123
+/** This will NOT work */
+router.push({ path: '/user', params: { userId } }) -> /user</code></pre>
+        </section>
+        <section>
+          <h3>$router et $route</h3>
+          <ul>
+            <li>$route.path : renvoie le chemin absolu de la route actuelle</li>
+            <li>$route.params : renvoie un objet contenant les parametres de la route</li>
+            <li>$route.query : renvoie un objet contenant les parametres passes en query de la route</li>
+            <li>$route.meta</li>
+            <li>$route.fullPath : renvoie l'URL complete (query, ...)</li>
+            <li>$route.matched : renvoie un tableau contenant la liste de toutes les routes matchees. Un element de ce
+              tableau est une copie de certains elements du router</li>
+          </ul>
+        </section>
+        <section>
+          <pre><code data-line-numbers>const router = new VueRouter({
+  routes: [
+    {
+      path: '/user/:userId',
+      name: 'user',
+      component: User
+    }
+  ]
+})
+
+
+<router-link :to="{ name: 'user', params: { userId: 123 }}">User</router-link></code></pre>
+          Il est egalement possible de nommer les routes afin de simplifier et d'expliciter la manipulation de celles
+          ci.
+        </section>
+        <section>
+          <h3>Les props</h3>
+          <pre><code data-line-numbers>const router = new VueRouter({
+  routes: [
+    {
+      path: '/promotion/from-newsletter',
+      component: Promotion,
+      props: { newsletterPopup: false }
+    }
+  ]
+})</code></pre>
+          <pre><code data-line-numbers>const router = new VueRouter({
+  routes: [
+    {
+      path: '/search',
+      component: SearchUser,
+      props: route => ({ query: route.query.q })
+    }
+  ]
+})
+          </code></pre>
+          Ces props sont a recuperer de la meme facon que des props "classiques" issus de composants parents
+        </section>
+        <section>
+          <h3>Les navigations guards</h3>
+          <pre><code>const router = new VueRouter({ ... })
+
+router.beforeEach((to, from, next) => {
+  // ...
+})</code></pre>
+          Cette interception sera appele charque fois qu'une navigation est declenchee. Tant que tout les hooks ne sont
+          pas resolus, la navigation est <b>en attente</b>
+        </section>
+        <section>
+          <h3>Les navigation guards</h3>
+          Chaque fonction d'interception recoit 3 parametres : to, from et next.
+          <ul>
+            <li>to : L'objet Route vers lequel on navigue</li>
+            <li>from : La route courante</li>
+            <li>next : Une fonction qui doit etre appele pour resoudre le hook. L'action depends de ses parametres :
+              <ul>
+                <li>next() : se deplace jusqu'au prochain hook. Si il n'en existe pas, la navigation est
+                  <b>confirmee</b>
+                </li>
+                <li>next(false) : Annule la navigation.</li>
+                <li>next('/') : redirige vers le nouvel URL. Attention, la navigation courante est annulee et une
+                  nouvelle commence. Il est donc tout a fait possible de redeclencher certains hooks</li>
+                <li>next(error) : Si l'argument est une instance de Error, la navigation s'arrete et l'erreur sera
+                  passees au router.onError()</li>
+              </ul>
+            </li>
+          </ul>
+        </section>
+        <section>
+          <h3>Les navigation guards</h3>
+          <pre><code>router.afterEach((to, from) => {
+  // ...
+})</code></pre>
+          Il existe egalement des hooks de sorties. Attention ces hooks ne recoivent pas de fonction next et ne peuvent
+          donc pas affecter la navigation.
+        </section>
+        <section>
+          <h3>Les navigation guards</h3>
+          <pre><code>const router = new VueRouter({
+  routes: [
+    {
+      path: '/foo',
+      component: Foo,
+      beforeEnter: (to, from, next) => {
+        // ...
+      }
+    }
+  ]
+})</code></pre>
+          Il est egalement possible de definir des hooks de sortie propres a une route. Ce hookj a le meme comportement
+          que les hooks globaux.
+        </section>
+        <section>
+          <h3>Les navigations guards</h3>
+          <pre><code data-line-numbers>const Foo = {
+  template: `...`,
+  beforeRouteEnter (to, from, next) {
+    // appelée avant que la route vers le composant soit confirmée.
+    // cette fonction n'a pas accès à l'instance du composant avec `this`,
+    // car le composant n'a pas encore été créé 
+    // quand cette interception est appelée !
+  },
+  beforeRouteUpdate (to, from, next) {
+    // appelée quand la route qui fait le rendu de ce composant change,
+    // mais que ce composant est utilisé de nouveau dans la nouvelle route.
+    // Par exemple, pour une route avec le paramètre dynamique `/foo/:id`, 
+    // quand nous naviguons entre `/foo/1` et `/foo/2`
+    // la même instance du composant `Foo`
+    // va être réutilisée, et ce hook va être appelé quand cela arrivera.
+    // ce hook a accès à l'instance de ce composant via `this`.
+  },
+  beforeRouteLeave (to, from, next) {
+    // appelée quand la route qui fait le rendu de ce composant est sur le point
+    // d'être laissée en faveur de la prochaine route.
+    // elle a accès à l'instance de ce composant via `this`.
+  }
+}</code></pre>
+        </section>
+      </section>
+      <section>
+        <h2>vue-class-component</h2>
+      </section>
+      <section>
+        <section>
+          <h3>Presentation</h3>
+        </section>
+        <section>
+          Vue Class Component est une bibliothèque qui vous permet de créer vos composants Vue avec une syntaxe de type
+          classe semblable a React.
+          Cette librairie ajoute aussi la possibilite de rendre du JSX via une fonction render.
+        </section>
+        <section>
+          <pre>
+              <code data-line-numbers><template>
+  <div>
+    <button v-on:click="decrement">-</button>
+    {{ count }}
+    <button v-on:click="increment">+</button>
+  </div>
+</template>
+
+<script>
+  import Vue from 'vue'
+  import Component from 'vue-class-component'
+
+  @Component
+  export default class Counter extends Vue {
+    // Class properties will be component data
+    count = 0
+
+    // Methods will be component methods
+    increment() {
+      this.count++
+    }
+
+    decrement() {
+      this.count--
+    }
+  }
+</script></code>
+            </pre>
+        </section>
+        <section>
+          <pre><code data-line-numbers>import Vue from 'vue'
+import Component from 'vue-class-component'
+
+@Component
+class Counter extends Vue {
+  count = 0
+
+  increment() {
+    this.count++
+  }
+
+  decrement() {
+    this.count--
+  }
+
+  render() {
+    return (
+      <div>
+        {
+          this.count <= 0
+          ? (
+            <button onClick={()=> this.decrement()}>-</button>
+          ) : null
+        }
+        { this.count }
+        <button onClick={()=> this.increment()}>+</button>
+      </div>
+    )
+  }
+}
+export default Counter;</code></pre>
+        </section>
+      </section>
+      <section>
+        <section>
+          <h3>Installation</h3>
+        </section>
+        <section>
+          <pre><code>$ npm install --save vue-class-component</code></pre>
+        </section>
+        <section>
+          <h4>.babelrc</h4>
+          <pre><code>{
+  "plugins": [
+    ["@babel/proposal-decorators", { "legacy": true }],
+    ["@babel/proposal-class-properties", { "loose": true }]
+  ]
+}</code></pre>
+          <h4>jsconfig.json</h4>
+          <pre><code>{
+  "compilerOptions": {
+    "experimentalDecorators": true
+  }
+}</code></pre>
+        </section>
+      </section>
+      <section>
+        <section>
+          <h3>Utilisation</h3>
+        </section>
+        <section>
+          <h4>Les data</h4>
+          <pre><code data-line-numbers>import Vue from 'vue'
+import Component from 'vue-class-component'
+
+@Component
+class Counter extends Vue {
+  count = 0
+}
+
+export default Counter;</code></pre>
+          Les data se definissent a l'interieur de la classe. Attention, pour assurer la reactivite celles-ci doivent
+          etre initialisees <em>(tout sauf undefined)</em>
+        </section>
+        <section>
+          <h4>Les methodes</h4>
+          <pre><code data-line-numbers>import Vue from 'vue'
+import Component from 'vue-class-component'
+
+@Component
+class Counter extends Vue {
+  
+  increment() {
+    this.count++;
+  }
+
+  decrement() {
+    this.count--;
+  }
+}
+
+export default Counter;</code></pre>
+          Les methodes se definissent a l'interieur de la classe. On y fait appel de la maniere suivante :
+          <pre><code>this.increment(args)</code></pre>
+        </section>
+        <section>
+          <h4>Les computed</h4>
+          <pre><code data-line-numbers>import Vue from 'vue'
+import Component from 'vue-class-component'
+
+@Component
+export default class HelloWorld extends Vue {
+  firstName = 'John'
+  lastName = 'Doe'
+
+  // Declared as computed property getter
+  get name() {
+    return this.firstName + ' ' + this.lastName
+  }
+
+  // Declared as computed property setter
+  set name(value) {
+    const splitted = value.split(' ')
+    this.firstName = splitted[0]
+    this.lastName = splitted[1] || ''
+  }
+
+  render() {
+    return (
+      <input v-model={this.name}>
+    )
+  }
+}</code></pre>
+        </section>
+        <section>
+          <h4>Les Props</h4>
+          <pre><code data-line-numbers>import Vue from 'vue'
+import Component from 'vue-class-component'
+
+const MessageProps = Vue.extend({
+  props: {
+    message: String,
+  },
+});
+
+
+@Component
+class Message extends MessageProps {
+  render() {
+    return (
+      <p>{ this.message }</p>
+    )
+  }
+}
+
+export default Message;</code></pre>
+          Attention, les props sont readonly. Il ne faut donc pas les modifier.
+        </section>
+        <section>
+          <h4>Les Watchers</h4>
+          <pre><code data-line-numbers>import Vue from 'vue'
+import Component from 'vue-class-component'
+
+@Component({
+  watch: {
+    message(newMessage, oldMessage) {
+      console.log(`L'ancien message etait ${oldMessage} et le nouveau est ${newMessage}`)
+    }
+  }
+})
+class Message extends MessageProps {
+  
+  message = '';
+
+  render() {
+    return (
+      <input type="text" v-model={this.message}>
+    )
+  }
+}
+
+export default Message;</code></pre>
+        </section>
+        <section>
+          <h4>Les hooks</h4>
+          <pre><code data-line-numbers>import Vue from 'vue'
+import Component from 'vue-class-component'
+
+@Component
+class Counter extends Vue {
+  
+  mounted() {
+    console.log('Le composant a ete monte')
+  }
+
+}
+export default Counter;</code></pre>
+          Les hooks de cycle de vie se declarent de la meme maniere que les methodes et ne se distinguent que par leurs
+          noms.
+        </section>
+        <section>
+          <h4>Les mixins</h4>
+          <pre><code data-line-numbers>import Vue from 'vue'
+import Component from 'vue-class-component'
+
+// You can declare mixins as the same style as components.
+@Component
+export class Hello extends Vue {
+  hello = 'Hello'
+}
+
+@Component
+export class World extends Vue {
+  world = 'World'
+}</code></pre>
+          <pre><code data-line-numbers>import Component, { mixins } from 'vue-class-component'
+import { Hello, World } from './mixins'
+
+@Component
+export class HelloWorld extends mixins(Hello, World) {
+  created () {
+    console.log(this.hello + ' ' + this.world + '!') // -> Hello World!
+  }
+}</code></pre>
+        </section>
+        <section>
+          Les mixins permettent donc d'abstraire des comportements communs a plusieurs composants. Ils permettent donc
+          de reduire la duplication de code.
+        </section>
+        <section>
+          A retenir : vue-class-component ne change que la synthaxe d'ecriture d'un composant. Il ne change en rien son
+          comportement.
+        </section>
+      </section>
+      <section>
+        <h2>vue-property-decorator</h2>
+      </section>
+      <section>
+        <h3>Installation</h3>
+        <pre><code>$ npm i -S vue-property-decorator</code></pre>
+      </section>
+      <section>
+        <section>
+          <h3>Utilisation</h3>
+        </section>
+        <section>
+          <pre><code data-line-numbers="1,6-12">import { Vue, Component, Prop, Watch } from "vue-property-decorator";
+
+@Component
+class Message extends Vue {
+
+  @Prop(String)
+  message;
+
+  @Watch('email')
+  onEmailChanged(newEmail, oldEmail) {
+    console.log("L'email a change")
+  }
+
+  email = null;
+
+  render() {
+    return (
+      <p>{ this.message }</p>
+      <input type="email" v-model={this.email}>
+    )
+  }
+}
+
+export default Message;</code></pre>
+        </section>
+      </section>
+      <section>
+        <h2>TP Todo list</h2>
+        Refactoriser le TP Todo list en utilisant vue-class-component et vue-property-decorator*
+      </section>
+      <section>
+        <section>
+          <h2>VueX</h2>
+        </section>
+        <section>
+          <h3>Des problemes</h3>
+          Plusieurs vues peuvent dépendre de la même partie de l'état global.
+          Des actions dans différentes vues peuvent avoir besoin de muter la même partie de l'état global.
+
+        </section>
+        <section>
+          <ul>
+            <li>Gestionnaire d'etat</li>
+            <li>Bibliothèque</li>
+            <li>Stocke des donnee globales</li>
+            <li><b>Changement de ces donnees previsibles</b></li>
+          </ul>
+          <img src="./assets/flow.png" width="50%">
+        </section>
+        <section>
+          <h3>Installation</h3>
+          <pre><code>$ npm install vuex --save</code></pre>
+          <pre><code data-line-numbers>import Vue from 'vue'
+import Vuex from 'vuex'
+
+Vue.use(Vuex)</code></pre>
+        </section>
+        <section>
+          <h3>Utilisation</h3>
+          Une application VueX contient :
+          <ul>
+            <li>Un store : une zone de stockage comparable a un conteneur</li>
+            <li>Un state : l'etat de l'application</li>
+          </ul>
+        </section>
+        <section>
+          Un store VueX est reactif. Donc si un composant utilise un element du store, et que celui-ci change, le
+          composant sera mis a jour.
+          Il est impossible de modifier directement l'etat du store. Il est necessaire de "commit" des mutations.
+        </section>
+        <section>
+          <li><em>store/counter.js</em></li>
+          <pre><code data-line-numbers>const store = new Vuex.Store({
+  state: {
+    count: 0
+  },
+  mutations: {
+    increment (state) {
+      state.count++
+    }
+  }
+})
+
+store.commit('increment')
+console.log(store.state.count) // -> 1</code></pre>
+        </section>
+        <section>
+          Afin d'acceder au store dans n'importe quel composant de notre application, il est necessaire d'injecter le
+          store dans l'application.
+          <pre><code data-line-numbers>new Vue({
+  router,
+  store,
+  render: (h) => h(App),
+}).$mount('#app');</code></pre>
+          <pre><code data-line-numbers="5">const Counter = {
+  template: `<div>{{ count }}</div>`,
+  computed: {
+    count () {
+      return this.$store.state.count
+    }
+  }
+}</code></pre>
+        </section>
+        <section>
+          Lorsqu'un composant a besoin d'utiliser plusieurs accesseurs ou propriétés de l'état du store, déclarer toutes
+          ces computed peut devenir répétitif et verbeux.
+          <pre><code data-line-numbers>/** Des fonctions utilitaires sont exposées telles que `Vuex.mapState` */
+import { mapState } from 'vuex'
+
+export default {
+  /** ...*/
+  computed: mapState({
+    /** les fonctions fléchées peuvent rendre le code très succinct ! */
+    count: state => state.count,
+
+    /** passer la valeur littérale 'count' revient à écrire `state => state.count` */
+    countAlias: 'count',
+
+    /** 
+    * pour accéder à l'état local avec `this`, 
+    * une fonction normale doit être utilisée
+    */
+    countPlusLocalState (state) {
+      return state.count + this.localCount
+    }
+  })
+}</code></pre>
+        </section>
+        <section>
+          <h4>Les getters</h4>
+          Vuex permet egalement de definir des getters dans le store afin d'eviter :
+          <li> De dupliquer un getter existants dans plusieurs composants</li>
+          <li> De creer une fonction utilitaire separee puis de l'importer</li>
+          <pre><code data-line-numbers>const store = new Vuex.Store({
+  state: {
+    todos: [
+      { id: 1, text: '...', done: true },
+      { id: 2, text: '...', done: false }
+    ]
+  },
+  getters: {
+    doneTodos: state => {
+      return state.todos.filter(todo => todo.done)
+    }
+  }
+})</code></pre>
+        </section>
+        <section>
+          <h4>Les getters</h4>
+          Les accesseurs seront exposés sur l'objet store.getters et vous accèderez aux valeurs comme des propriétés :
+          <pre><code data-line-numbers>store.getters.doneTodos // -> [{ id: 1, text: '...', done: true }]</code></pre>
+          Les accesseurs recevront également les autres accesseurs en second argument :
+          <pre><code data-line-numbers>getters: {
+  // ...
+  doneTodosCount: (state, getters) => {
+    return getters.doneTodos.length
+  }
+}</code></pre>
+          <pre><code data-line-numbers>store.getters.doneTodosCount // -> 1</code></pre>
+        </section>
+        <section>
+          <h4>Les getters</h4>
+          Il est egalement posssible de passer un arguement aux getters en retournant une fonction.
+          <pre><code data-line-numbers>getters: {
+  // ...
+  getTodoById: (state) => (id) => {
+    return state.todos.find(todo => todo.id === id)
+  }
+}</code></pre>
+          <pre><code>store.getters.getTodoById(2) // -> { id: 2, text: '...', done: false }</code></pre>
+        </section>
+        <section>
+          <h4>les getters</h4>
+          Tout comme avec le state, il existe une fonction utilitaire permettant de mapper les getters du store avec les
+          computeds d'un composant
+          <pre><code data-line-numbers>import { mapGetters } from 'vuex'
+
+export default {
+  // ...
+  computed: {
+    ...mapGetters([
+      'doneTodosCount',
+      'anotherGetter',
+      // ...
+    ])
+  }
+}</code></pre>
+        </section>
+        <section>
+          <h3>Les mutations</h3>
+        </section>
+        <section>
+          <h4>
+            Les mutations
+          </h4>
+          La mutation est la seule facon de modifier proprement un store. Cette mutation doit : etre effectuee via un
+          "commit" et etre synchrone.
+          <pre><code data-line-numbers>const store = new Vuex.Store({
+  state: {
+    count: 1
+  },
+  mutations: {
+    increment (state) {
+      // muter l'état
+      state.count++
+    }
+  }
+})
+
+store.commit('increment')</code></pre>
+        </section>
+        <section>
+          Il est egalement possible de commit une mutation avec des parametres :
+          <pre><code data-line-numbers>// ...
+mutations: {
+  increment (state, n) {
+    state.count += n
+  }
+}</code></pre>
+          <pre><code>store.commit('increment', 10)</code></pre>
+          <pre><code data-line-numbers>mutations: {
+  increment (state, payload) {
+    state.count += payload.amount
+  }
+}</code></pre>
+          <pre><code>store.commit('increment', {
+  amount: 10
+})</code></pre>
+          <pre><code>store.commit({
+  type: 'increment',
+  amount: 10
+})</code></pre>
+        </section>
+        <section>
+          Comme vu precedemment, il est possible de mapper les differentes mutations sur les methodes d'un composant :
+          <pre><code data-line-numbers>import { mapMutations } from 'vuex'
+
+export default {
+
+  methods: {
+    ...mapMutations([
+      // attacher `this.increment()` à `this.$store.commit('increment')`  
+      'increment',
+
+      // `mapMutations` supporte également les paramètres additionnels :
+      // attacher `this.incrementBy(amount)` à `this.$store.commit('incrementBy', amount)`
+      'incrementBy' 
+    ]),
+    ...mapMutations({
+      // attacher `this.add()` à `this.$store.commit('increment')`
+      add: 'increment' 
+    })
+  }
+}</code></pre>
+        </section>
+        <section>
+          <h3>Les actions</h3>
+        </section>
+        <section>
+          <h4>Les actions</h4>
+          Les actions sont similaires aux mutations a la difference que :
+          <ul>
+            <li>Au lieu de modifier le state, les actions commit des mutations.</li>
+            <li>Les actions peuvent contenir des opérations asynchrones.</li>
+          </ul>
+          <pre><code data-line-numbers>const store = new Vuex.Store({
+  state: {
+    count: 0
+  },
+  mutations: {
+    increment (state) {
+      state.count++
+    }
+  },
+  actions: {
+    increment (context) {
+      context.commit('increment')
+    }
+  }
+})</code></pre>
+        </section>
+        <section>
+          <h4>les actions</h4>
+          Les actions recoivent un object <em>context</em> qui expose les memes methodes et proprietes du store.
+          On peut donc destructer les parametres afin de ne recuperer uniquement que ce qui nous interesse :
+          <pre><code>actions: {
+  increment ({ commit }) {
+    commit('increment')
+  }
+}</code></pre>
+        </section>
+        <section>
+          <h4>Les actions</h4>
+          Les actions sont declenchees par :
+          <pre><code>store.dispatch('increment')</code></pre>
+          Mais pourquoi ne pas simplement commit ?
+        </section>
+        <section>
+          <h4>Les actions</h4>
+          <pre><code>actions: {
+  incrementAsync ({ commit }) {
+    setTimeout(() => {
+      commit('increment')
+    }, 1000)
+  }
+}</code></pre>
+          <pre><code data-line-numbers>// dispatch avec un paramètre additionnel
+store.dispatch('incrementAsync', {
+  amount: 10
+})
+
+// dispatch avec un objet
+store.dispatch({
+  type: 'incrementAsync',
+  amount: 10
+})</code></pre>
+        </section>
+        <section>
+          <pre><code data-line-numbers>actions: {
+  checkout ({ commit, state }, products) {
+    // sauvegarder les articles actuellement dans le panier
+    const savedCartItems = [...state.cart.added]
+    // envoyer la requête de checkout,
+    // et vider le panier
+    commit('checkoutRequest')
+    // l'API de la boutique en ligne prend une fonction de rappel en cas de succès et une autre en cas d'échec
+    shop.buyProducts(
+      products,
+      // gérer le succès
+      () => commit('checkoutSuccess'),
+      // gérer l'échec
+      () => commit('checkoutFailure', savedCartItems)
+    )
+  }
+}</code></pre>
+        </section>
+        <section>
+          <h3>Les modules</h3>
+        </section>
+        <section>
+          <h4>Les modules</h4>
+          Au fur et a mesure que notre store grandit, il devient necessaire de fragmenter le store en plusieurs modules.
+          <pre><code data-line-numbers>const moduleA = {
+  state: () => ({ ... }),
+  mutations: { ... },
+  actions: { ... },
+  getters: { ... }
+}
+
+const moduleB = {
+  state: () => ({ ... }),
+  mutations: { ... },
+  actions: { ... }
+}
+
+const store = new Vuex.Store({
+  modules: {
+    a: moduleA,
+    b: moduleB
+  }
+})
+
+store.state.a // -> l'état du `moduleA`
+store.state.b // -> l'état du `moduleB`
+        </code></pre>
+        </section>
+      </section>
+      <section>
+        <section>
+          <h3>VuexORM et VuexOrm Axios</h3>
+        </section>
+        <section>
+          <h4>VueXORM</h4>
+          Vuex ORM est un plugin pour Vuex permettant l'accès au store Vuex par Object-Relational Mapping (ORM).
+          <pre><code data-line-numbers>[
+  {
+    id: 1,
+    body: '.....',
+    author: { id: 1, name: 'User 1' },
+    comments: [
+      {
+        id: 1,
+        comment: '.....',
+        author: { id: 2, name: 'User 2' }
+      },
+      {
+        id: 2,
+        comment: '.....',
+        author: { id: 2, name: 'User 2' }
+      }
+    ]
+  },
+]</code></pre>
+        </section>
+        <section>
+          <h4>Normaliser la data</h4>
+          <ul>
+            <li>Chaque type possede sa propre "table" dans le state</li>
+            <li>Chaque table doit stocker un item sous forme d'un objet ou l'id est la cle et l'item la valuer</li>
+            <li>Chaque references a d'autres objets doit se faire via des cle etrangeres</li>
+          </ul>
+          <pre><code data-line-numbers>{
+  posts: {
+    1: { id: 1, user_id: 1, body: '.....' },
+  },
+
+  comments: {
+    3: { id: 3, user_id: 3, post_id: 1, comment: '.....' },
+    4: { id: 4, user_id: 1, post_id: 1, comment: '.....' },
+    5: { id: 5, user_id: 3, post_id: 1, comment: '.....' }
+  },
+
+  users: {
+    1: { id: 1, name: 'User 1' },
+    3: { id: 3, name: 'User 3' }
+  }
+}</code></pre>
+        </section>
+        <section>
+          <h4>Normaliser la data</h4>
+          Il existe certains avantages a normaliser de la data :
+          <ul>
+            <li>Comme chaque élément n'est défini qu'à un seul endroit, nous ne devons pas essayer d'apporter des
+              modifications à plusieurs endroits si cet élément est mis à jour.</li>
+            <li>La logique qui interagit avec les données n'a pas à gérer des niveaux profonds d'imbrication, elle sera
+              donc probablement beaucoup plus simple.</li>
+            <li>Nous pouvons rechercher un element directement en quelques étapes simples, sans avoir à fouiller dans
+              d'autres objets pour le trouver.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Comment VueX Orm gere la data ?</h3>
+        </section>
+        <section>
+          <h4>Les models</h4>
+          Avant tout, il sera necessaire de creer un "Model" par type d'entites.
+          <pre><code data-line-numbers>class Post extends Model {
+  static entity = 'posts'
+
+  static fields () {
+    return {
+      id: this.attr(null),
+      user_id: this.attr(null),
+      body: this.string(''),
+      comments: this.hasMany(Comment, 'post_id')
+    }
+  }
+}
+
+class Comment extends Model {
+  static entity = 'comments'
+
+  static fields () {
+    return {
+      id: this.attr(null),
+      user_id: this.attr(null),
+      post_id: this.attr(null),
+      comment: this.string(''),
+      author: this.belongsTo(User, 'user_id')
+    }
+  }
+}
+
+class User extends Model {
+  static entity = 'users'
+
+  static fields () {
+    return {
+      id: this.attr(null),
+      name: this.string('')
+    }
+  }
+}
+</code></pre>
+        </section>
+        <section>
+          <h4>Les models</h4>
+          Il est donc desormais possible d'ajouter simplement des data via la methode insert :
+          <pre><code>Post.insert({ data: posts })</code></pre>
+          Avec cette simple methode, VuexORM va automatiquement normaliser la data passee et la sauvegarder au sein du
+          state du store de cette maniere :
+          <pre><code data-line-numbers>{
+  entities: {
+    posts: {
+      data: {
+        1: { id: 1, user_id: 1, body: '.....' },
+        2: { id: 2, user_id: 2, body: '.....' }
+      },
+    },
+  },
+}</code></pre>
+        </section>
+        <section>
+          <h4>Recuperation de donnees</h4>
+          <pre><code data-line-numbers>// Fetch all posts.
+const posts = Post.all()
+
+/*
+  [
+    { id: 1, body: '.....' },
+    { id: 2, body: '.....' }
+  ]
+*/
+</code></pre>
+        </section>
+        <section>
+          <h4>Recuperation de donnees</h4>
+          <pre><code data-line-numbers>// Fetch all posts with its relation.
+const posts = Post.query().with('author').get()
+
+/*
+  [
+    {
+      id: 1,
+      body: '.....',
+      author: {
+        id: 1,
+        name: 'User 1'
+      }
+    },
+    {
+      id: 2,
+      body: '.....',
+      author: {
+        id: 2,
+        name: 'User 2'
+      }
+    }
+  ]
+*/
+</code></pre>
+        </section>
+        <section>
+          <h4>Recuperation de donnees</h4>
+          <pre><code data-line-numbers>// Fetch data matching specific condition.
+const posts = Post.query().with('author').where('id', 1).get()
+
+/*
+  [
+    {
+      id: 1,
+      body: '.....',
+      author: {
+        id: 1,
+        username: 'user1',
+        name: 'User 1'
+      }
+    }
+  ]
+*/
+</code></pre>
+        </section>
+      </section>
+      <section>
+        <section>
+          <h3>Installation</h3>
+          <pre><code>$ npm install vue vuex @vuex-orm/core --save</code></pre>
+        </section>
+        <section>
+          <h3>Utilisation</h3>
+        </section>
+        <section>
+          <h4>Utilisation</h4>
+          Comme vu precedemment, il est necessaire de definir un model par "type" d'entites
+          <pre><code data-line-numbers>// User Model
+
+import { Model } from '@vuex-orm/core'
+
+export default class User extends Model {
+  // This is the name used as module name of the Vuex Store.
+  static entity = 'users'
+
+  // List of all fields (schema) of the post model. `this.attr` is used
+  // for the generic field type. The argument is the default value.
+  static fields () {
+    return {
+      id: this.attr(null),
+      name: this.attr(''),
+      email: this.attr('')
+    }
+  }
+}
+</code></pre>
+        </section>
+        <section>
+          <pre><code data-line-numbers>// Post Model
+
+import { Model } from '@vuex-orm/core'
+import User from './User'
+
+export default class Post extends Model {
+  static entity = 'posts'
+
+  // `this.belongsTo` is for belongs to relationship. The first argument is
+  // the Model class, and second is the field name for the foreign key.
+  static fields () {
+    return {
+      id: this.attr(null),
+      user_id: this.attr(null),
+      title: this.attr(''),
+      body: this.attr(''),
+      published: this.attr(false),
+      author: this.belongsTo(User, 'user_id')
+    }
+  }
+}
+          </code></pre>
+        </section>
+        <section>
+          <h4>Utilisation</h4>
+          Puis, il est obligatoire d'instancier une BDD et d'y "register" les differents models
+          <pre><code data-line-numbers>import Vue from 'vue'
+import Vuex from 'vuex'
+import VuexORM from '@vuex-orm/core'
+import User from '@/models/User'
+import Post from '@/models/Post'
+
+Vue.use(Vuex)
+
+/** Create new instance of Database. */
+const database = new VuexORM.Database()
+
+/** Register Models. */
+database.register(User)
+database.register(Post)
+
+/** Create Vuex Store and register database through Vuex ORM. */
+const store = new Vuex.Store({
+  plugins: [VuexORM.install(database)]
+})
+
+export default store</code></pre>
+        </section>
+        <section>
+          <h4>Insertion et mise a jour</h4>
+          <ul>
+            3 methodes a retenir :
+            <li>insert</li>
+            <li>create</li>
+            <li>new</li>
+          </ul>
+          <pre><code data-line-numbers>User.insert({
+  data: { id: 1, name: 'John' }
+})
+
+User.create({
+  data: { id: 1, name: 'John' }
+})
+
+/** Cree une nouvelle entitee avec les valeurs par default */
+User.new()</code></pre>
+        </section>
+        <section>
+          <h4>Mais quelle difference entre insert et create ?</h4>
+        </section>
+        <section>
+          <h4>Insertion et mise a jour</h4>
+          La différence entre la méthode insert et la méthode create est de savoir si l'on doit conserver les données
+          existantes ou non. La méthode create va remplacer toutes les données existantes dans le store et les remplacer
+          par les données données, tandis que la méthode insert va créer de nouvelles données et laisser les données
+          existantes telles quelles.
+        </section>
+        <section>
+          <pre><code data-line-numbers>{
+  entities: {
+    users: {
+      data: {
+        1: { id: 1, name: 'John' }
+      }
+    }
+  }
+}
+
+User.insert({
+  data: { id: 2, name: 'Jane' }
+})
+
+{
+  entities: {
+    users: {
+      data: {
+        1: { id: 1, name: 'John' },
+        2: { id: 2, name: 'Jane' }
+      }
+    }
+  }
+}</code></pre>
+        </section>
+        <section>
+          <pre><code data-line-numbers>{
+  entities: {
+    users: {
+      data: {
+        1: { id: 1, name: 'John' }
+      }
+    }
+  }
+}
+
+User.create({
+  data: { id: 2, name: 'Jane' }
+})
+
+{
+  entities: {
+    users: {
+      data: {
+        2: { id: 2, name: 'Jane' }
+      }
+    }
+  }
+}</code></pre>
+        </section>
+        <section>
+          <h4>Insertion et mise a jour</h4>
+          <h5>Les relations (belongsTo)</h5>
+          <pre><code data-line-numbers>class User extends Model {
+  static entity = 'users'
+
+  static fields () {
+    return {
+      id: this.attr(null),
+      name: this.attr('')
+    }
+  }
+}
+
+class Post extends Model {
+  static entity = 'posts'
+
+  static fields () {
+    return {
+      id: this.attr(null),
+      user_id: this.attr(null),
+      title: this.attr(''),
+      author: this.belongsTo(User, 'user_id')
+    }
+  }
+}
+</code></pre>
+        </section>
+        <section>
+          <h4>Insertion et mise a jour</h4>
+          <h5>Les relations (belongsTo)</h5>
+          <pre><code data-line-numbers>Post.insert({
+  data: {
+    id: 1,
+    user_id: 1,
+    title: 'Post title.',
+    author: {
+      id: 1,
+      name: 'John Doe '
+    }
+  }
+})
+//////////////////////////////////////////////////////////////
+{
+  entities: {
+    posts: {
+      data: {
+        1: { id: 1, user_id: 1, title: 'Post title' }
+      }
+    },
+    users: {
+      data: {
+        1: { id: 1, name: 'John Doe' }
+      }
+    }
+  }
+}</code></pre>
+        </section>
+        <section>
+          <h4>Insertion et mise a jour</h4>
+          <h5>Les relations (hasMany)</h5>
+          <pre><code data-line-numbers>class User extends Model {
+  static entity = 'users'
+
+  static fields () {
+    return {
+      id: this.attr(null),
+      name: this.attr(''),
+      posts: this.hasMany(Post, 'user_id')
+    }
+  }
+}
+
+class Post extends Model {
+  static entity = 'posts'
+
+  static fields () {
+    return {
+      id: this.attr(null),
+      user_id: this.attr(null),
+      title: this.attr('')
+    }
+  }
+}
+</code></pre>
+        </section>
+        <section>
+          <h4>Insertion et mise a jour</h4>
+          <h5>Les relations (hasMany)</h5>
+          <pre><code data-line-numbers>User.insert({
+  data: {
+    id: 1,
+    name: 'John Doe ',
+    posts: [
+      { id: 1, user_id: 1, title: 'Post title 1' },
+      { id: 2, user_id: 1, title: 'Post title 2' }
+    ]
+  }
+})
+/////////////////////////////////////////////////////////////////
+{
+  entities: {
+    posts: {
+      data: {
+        1: { id: 1, user_id: 1, title: 'Post title 1' }
+        2: { id: 2, user_id: 1, title: 'Post title 2' }
+      }
+    },
+    users: {
+      data: {
+        1: { id: 1, name: 'John Doe' }
+      }
+    }
+  }
+}
+</code></pre>
+        </section>
+        <section>
+          <h4>Insertion et mise a jour</h4>
+          <h5>Les relations (ManyToMany)</h5>
+          <pre><code data-line-numbers>class User extends Model {
+  static entity = 'users'
+
+  static fields () {
+    return {
+      id: this.attr(null),
+      roles: this.belongsToMany(Role, RoleUser, 'user_id', 'role_id')
+    }
+  }
+}
+
+class Role extends Model {
+  static entity = 'roles'
+
+  static fields () {
+    return {
+      id: this.attr(null)
+    }
+  }
+}
+
+class RoleUser extends Model {
+  static entity = 'role_user'
+
+  static primaryKey = ['role_id', 'user_id']
+
+  static fields () {
+    return {
+      id: this.attr(null),
+      role_id: this.attr(null),
+      user_id: this.attr(null),
+      level: this.number(1)
+    }
+  }
+}
+</code></pre>
+        </section>
+        <section>
+          <h4>Insertion et mise a jour</h4>
+          <h5>Les relations (ManyToMany)</h5>
+          <pre><code data-line-numbers>User.insert({
+  data: {
+    id: 1,
+    roles: [
+      {
+        id: 1,
+        pivot: { id: 1, level: 2 }
+      },
+      {
+        id: 2,
+        pivot: { id: 2, level: 3 }
+      }
+    ]
+  }
+})
+
+/** Note : nous pouvons inserer les data de la table intermediaire sous l'arttribut
+pivot. */
+
+/////////////////////////////////////////////////////////////
+
+{
+  entities: {
+    users: {
+      1: { id: 1 }
+    },
+    roles: {
+      1: { id: 1 },
+      2: { id: 2 }
+    },
+    role_user: {
+      1: { id: 1, user_id: 1, role_id: 1, level: 2 },
+      2: { id: 2, user_id: 1, role_id: 2, level: 3 }
+    }
+  }
+}</code></pre>
+
+        </section>
+        <section>
+          <h4>Insertion et mise a jour</h4>
+          Insert et create renvoient tous deux les données insérées sous forme de Promise afin que vous puissiez les
+          obtenir comme valeur de retour. La valeur de retour contiendra toutes les données qui ont été créées.
+          <pre><code data-line-numbers>User.create({
+  data: { id: 1, name: 'John Doe' }
+}).then((entities) => {
+  console.log(entities)
+})
+
+const entities = await User.create({
+  data: { id: 1, name: 'John Doe' }
+})
+console.log(entities)
+</code></pre>
+        </section>
+        <section>
+          <h4>Mise a jour</h4>
+          La fonction update prend un object en parametre contenant :
+          <ul>
+            <li>Une condition where : peut etre un nombre ou une string (id de l'entite)</li>
+            <li>un payload data : contient les data a mettre a jour</li>
+          </ul>
+          <pre><code data-line-numbers>{
+  entities: {
+    users: {
+      1: { id: 1, name: 'John', age: 20 },
+      2: { id: 2, name: 'Jane', age: 30 }
+    }
+  }
+}
+
+User.update({
+  where: 2,
+  data: { age: 24 }
+})
+
+{
+  entities: {
+    users: {
+      1: { id: 1, name: 'John', age: 20 },
+      2: { id: 2, name: 'Jane', age: 24 }
+    }
+  }
+}</code></pre>
+        </section>
+        <section>
+          <h4>Mise a jour</h4>
+          Il est egalement possible de passer une fonction au where afin de determiner la data a update. Cette fonction
+          doit retourner un booleen et prends en argument l'object cible.
+          <pre><code data-line-numbers>{
+  entities: {
+    users: {
+      1: { id: 1, name: 'John', age: 20, active: false },
+      2: { id: 2, name: 'Jane', age: 20, active: false },
+      3: { id: 3, name: 'Johnny', age: 30, active: false }
+    }
+  }
+}
+
+User.update({
+  where: (user) => {
+    return user.age === 20
+  },
+
+  data: { active: true }
+})</code></pre>
+        </section>
+        <section>
+          <h4>Mise a jour</h4>
+          Tout comme avec le where, data peut recevoir un fonction. Cette approche est souvent utilisee pour effectuer
+          un traitement sur des objets ou des tableaux
+          <pre><code data-line-numbers>{
+  entities: {
+    users: {
+      1: { id: 1, name: 'John', age: 20, keywords: ['sales'] },
+      2: { id: 2, name: 'Jane', age: 30, keywords: ['marketing'] }
+    }
+  }
+}
+
+User.update({
+  where: 2,
+
+  data (user) {
+    user.name = 'Jane Doe'
+    user.keywords.push('pr')
+  }
+})</code></pre>
+        </section>
+        <section>
+          <h4>Mise a jour</h4>
+          De la meme facon que precedemment, il est possible de mettre a jour des relations
+          <pre><code data-line-numbers>{
+  entities: {
+    users: {
+      1: { id: 1, name: 'John', age: 20 }
+    },
+    posts: {
+      1: { id: 1, user_id: 1, title: 'Post title 1' },
+      2: { id: 2, user_id: 1, title: 'Post title 2' }
+    }
+  }
+}
+
+User.update({
+  where: 1,
+  data: {
+    name: 'John Doe',
+    posts: [
+      { id: 1, title: 'Edited post title' }
+    ]
+  }
+})</code></pre>
+        </section>
+        <section>
+          <h4>Mise a jour</h4>
+          Tout comme insert ou create, update renvoie egalement une Promise contenant l'entite mise a jour.
+          <pre><code data-line-numbers>const user = await User.update({ id: 1, age: 24 })
+
+/** { users: [{ id: 1, name: 'John Doe', age: 24 }] } */
+
+const user = await User.update({
+  where: 1,
+  data: { age: 24 }
+})
+
+// { id: 1, name: 'John Doe', age: 24 },
+
+const user = await User.update({
+  where: record => record.age === 30,
+  data: { age: 24 }
+})
+
+/*
+  [
+    { id: 1, name: 'John Doe', age: 24 },
+    { id: 2, name: 'Jane Doe', age: 24 }
+  ]
+*/
+          </code></pre>
+        </section>
+        <section>
+          <h4>Mise a jour</h4>
+          La méthode insertOrUpdate insère de nouvelles données si des records n'existent pas dans le store, et met à
+          jour les données des records qui existent.
+          <pre><code data-line-numbers>// Initial State.
+{
+  entities: {
+    users: {
+      data: {
+        1: { id: 1, name: 'John', title: 'Sales' }
+      }
+    }
+  }
+}
+</code></pre>
+        </section>
+        <section>
+          <pre><code data-line-numbers>User.insertOrUpdate({
+  data: [
+    { id: 1, name: 'Peter' },
+    { id: 2, name: 'Hank' }
+  ]
+})
+
+{
+  entities: {
+    users: {
+      data: {
+        1: { id: 1, name: 'Peter', title: 'Sales' },
+        2: { id: 2, name: 'Hank', title: null  }
+      }
+    }
+  }
+}</code></pre>
+        </section>
+        <section>
+          <h3>Recuperation de donnees</h3>
+        </section>
+        <section>
+          <h4>Recuperation de donnees</h4>
+          <pre><code data-line-numbers>/** get all users. */
+const users = User.all()
+
+/** Get a user with id of 1. */
+const users = User.find(1)
+</code></pre>
+        </section>
+        <section>
+          <h4>Le query builder</h4>
+          <pre><code data-line-numbers>/** Get all users through Query Builder. */
+const users = User.query().get()
+
+/** Get the first user of the query. */
+const user = User.query().first()
+
+/** Get the last user of the query. */
+const user = User.query().last()
+</code></pre>
+        </section>
+        <section>
+          <h4>Le query builder (where)</h4>
+          <pre><code data-line-numbers>/** Get users with age of 20. */
+const user = User.query().where('age', 20).get()
+
+/** Get users with age higher than 20. */
+const user = User.query().where('age', (value) => value > 20).get()
+
+/** Get users with age higher than 20 and also a female. */
+const user = User.query().where((user) => {
+  return user.age > 20 && user.sex === 'female'
+}).get()
+
+/** Fetch users with role of `admin`, or name of `John`. */
+const user = User.query()
+  .where('role', 'admin')
+  .orWhere('name', 'John')
+  .get()
+
+</code></pre>
+        </section>
+        <section>
+          <h4>Le query builder (exists)</h4>
+          <pre><code data-line-numbers>/** Check whether the user store contains any data. */
+const resultExists = User.exists()
+
+/** Check whether an user with id 5 exists. */
+const resultExists = User.query().where('id', 5).exists()
+</code></pre>
+        </section>
+        <section>
+          <h4>Le query builder (orderBy)</h4>
+          <pre><code data-line-numbers>/** Order users by name. */
+const users = User.query().orderBy('name').get()
+
+/** You may also chain orderBy. */
+const users = User.query()
+  .orderBy('name')
+  .orderBy('age', 'desc')
+  .get()
+
+</code></pre>
+        </section>
+        <section>
+          <h4>Le query builder (limit & offset)</h4>
+          <pre><code data-line-numbers>const user = User.query().limit(2).get()
+
+const user = User.query().offset(2).get()
+
+const user = User.query().offset(1).limit(2).get()
+          </code></pre>
+        </section>
+        <section>
+          <h4>Le query builder (Aggregations)</h4>
+          <pre><code data-line-numbers>const users = User.query().count()
+
+const mostLiked = Post.query().max('like')
+
+const cheapest = Order.query().min('price')
+
+const total = Order.query().sum('price')
+
+const users = User.query().where('role', 'user').count()
+</code></pre>
+        </section>
+        <section>
+          <h4>Le query builder (Les relations)</h4>
+          <pre><code data-line-numbers>const user = User.query().with('profile').with('posts').first()
+const user = User.query().with(['profile', 'posts']).first()
+
+/**
+  {
+    id: 1,
+    name: 'John',
+
+    profile: {
+      id: 1,
+      user_id: 1,
+      age: 24
+    },
+
+    posts: [
+      { id: 1, user_id: 1, body: '...' },
+      { id: 2, user_id: 1, body: '...' }
+    ]
+  }
+*/
+</code></pre>
+        </section>
+        <section>
+        <h4>Le query builder (Les relations)</h4>
+        <pre><code data-line-numbers>const user = User.query().with('posts.comments').first()
+
+/**
+  {
+    id: 1,
+    name: 'john',
+
+    posts: [
+      {
+        id: 1,
+        user_id: 1,
+        body: '...',
+
+        comments: [
+          { id: 1, post_id: 1, body: '...' },
+          { id: 2, post_id: 1, body: '...' }
+        ]
+      },
+      {
+        id: 2,
+        user_id: 1,
+        body: '...',
+
+        comments: [
+          { id: 3, post_id: 2, body: '...' },
+          { id: 4, post_id: 2, body: '...' }
+        ]
+      }
+    ]
+  }
+*/
+</code></pre>
+        </section>
+        <section>
+          <h4>Le query builder (Les relations)</h4>
+          <pre><code data-line-numbers>const user = User.query().withAll().first()
+
+/*
+  {
+    id: 1,
+    name: 'john',
+
+    profile: {
+      id: 1,
+      user_id: 1,
+      age: 24
+    },
+
+    posts: [
+      {
+        id: 1,
+        user_id: 1,
+        body: '...'
+      },
+
+      {
+        id: 2,
+        user_id: 1,
+        body: '...'
+      }
+    ]
+  }
+*/
+</code></pre>
+        </section>
+        <section>
+          <h4>Le query builder (Les relations)</h4>
+          <pre><code data-line-numbers>const user = User.query().withAllRecursive().first()
+
+/*
+  User {
+    id: 1,
+    name: 'john',
+
+    profile: {
+      id: 1,
+      user_id: 1,
+      age: 24
+    },
+
+    posts: [
+      {
+        id: 1,
+        user_id: 1,
+        body: '...',
+
+        comments: [
+          { id: 1, post_id: 1, body: '...' },
+          { id: 2, post_id: 1, body: '...' }
+        ]
+      },
+      {
+        id: 2,
+        user_id: 1,
+        body: '...',
+
+        comments: [
+          { id: 3, post_id: 2, body: '...' },
+          { id: 4, post_id: 2, body: '...' }
+        ]
+      },
+    ]
+  }
+*/
+</code></pre>
+        </section>
+        <section>
+          <h4>Le query builder (Les relations)</h4>
+          <pre><code data-line-numbers>// Get all users with posts that have `published` field value of `true`.
+const user = User.query().with('posts', (query) => {
+  query.where('published', true)
+}).get()
+
+/*
+  [
+    {
+      id: 1,
+      name: 'John',
+      posts: [
+        { id: 1, user_id: 1, body: '...', published: true },
+        { id: 2, user_id: 1, body: '...', published: true }
+      ]
+    }
+  ]
+*/
+</code></pre>
+        </section>
+        <section>
+          <h4>La suppression</h4>
+          <pre><code data-line-numbers>/** Delete all inactive users. */
+User.delete((user) => {
+  return !user.active
+})
+
+/** Delete user by id */
+User.delete(1)
+
+/** Delete all users. */
+User.deleteAll()</code></pre>
+        </section>
+      </section>
+      <section>
+        <section>
+          <h3>Vuex orm Axios</h3>
+        </section>
+        <section>
+          <h4>Installation</h4>
+          <pre><code>$ npm install @vuex-orm/plugin-axios --save
+            
+$ npm install --save axios</code></pre>
+        </section>
+        <section>
+          <h4>Installation</h4>
+          <pre><code data-line-numbers>import axios from 'axios'
+import Vuex from 'vuex'
+import VuexORM from '@vuex-orm/core'
+import VuexORMAxios from '@vuex-orm/plugin-axios'
+import User from '@/models/User'
+
+VuexORM.use(VuexORMAxios, { axios })
+
+const database = new VuexORM.Database()
+
+database.register(User)
+
+const store = new Vuex({
+  plugins: [VuexORM.install(database)]
+})
+</code></pre>
+        </section>
+        <section>
+          <h4>Utilisation</h4>
+          Vuex ORM Axios ajoute une méthode asynchrone api() à tous les models qui, lorsqu'elle est appelée, instancie une nouvelle requête axios pour un model. À partir de ces requêtes, les models sont capables de persister automatiquement les data recues dans le store.
+          <pre><code>await User.api().get('https://example.com/api/users')</code></pre>
+        </section>
+        <section>
+          <h4>Utilisation</h4>
+          <pre><code data-line-numbers>User.api().get(url, config)
+User.api().post(url, data, config)
+User.api().put(url, data, config)
+User.api().patch(url, data, config)
+User.api().delete(url, config)
+User.api().request(config)</code></pre>
+        </section>
+      </section>
+      <section>
+        <h3>TP Todo list</h3>
+        <ul>
+          <li>Creer une nouvelle page permettant la gestion des utilisateurs (Ajout et suppression)</li>
+          <li>Toutes les donnees doivent etre gere dans un store Vue X</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+  <script src="dist/reveal.js"></script>
+  <script src="plugin/notes/notes.js"></script>
+  <script src="plugin/markdown/markdown.js"></script>
+  <script src="plugin/highlight/highlight.js"></script>
+  <script>
+    // More info about initialization & config:
+    // - https://revealjs.com/initialization/
+    // - https://revealjs.com/config/
+    Reveal.initialize({
+      hash: true,
+      controls: true,
+      controlsLayout: 'bottom-right',
+      progress: true,
+      markdown: {
+        smartypants: true
+      },
+      width: 1280,
+      height: 720,
+      margin: -1,
+      minScale: 0.2,
+      maxScale: 1.5,
+
+      // Learn about plugins: https://revealjs.com/plugins/
+      plugins: [RevealMarkdown, RevealHighlight, RevealNotes]
+    });
+  </script>
+</body>
+
+</html>
